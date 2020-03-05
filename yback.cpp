@@ -1,9 +1,15 @@
 #include <iostream>
-using namespace std;
-#include <cassert>
-#include <ynn.h>
+#include <functional>
+#include <map>
+#include <fstream>
+#include <sstream>
+#include "header/getopt_class.h"
+#include "header/misc.h"
+#include "header/color.h"
 
-// #define NDEBUG
+using namespace std;
+
+#define NDEBUG
 
 namespace prm {
 
@@ -21,7 +27,7 @@ namespace prm {
 
     const string default_tmp_directory = "/tmp";
 
-    const string default_managed_file_list_file = ynn::word_expansion("~/.yback_managed_file_list")[0];
+    const string default_managed_file_list_file = misc::word_expansion("~/.yback_managed_file_list")[0];
 
     void print_usage() {
 
@@ -29,34 +35,38 @@ namespace prm {
 
             cout << "\
 \e[;100mUsage\e[0m\n\
-  back [<option(s)>] [<rsync option(s)>]\n\
+  back [<option(s)>] [-- [<rsync option(s)>]]\n\
   \n\
 \e[;100mOptions\e[0m\n\
-    \e[94m--show,-s\e[0m: コマンドを実際には実行しない(dry-run)\n\
-    \e[94m--file,-f\e[0m: バックアップの実行前に、続くファイル引数を一時フォルダへ複製する\n\
-    \e[94m    --add\e[0m: 自動管理ファイルリストに、続くファイル引数を追加する\n\
-   \e[94m--only-add\e[0m: 同上だが、実際のバックアップまでは行わない\n\
-    \e[94m--bkrc,-b\e[0m: デフォルトの設定ファイルに加え、続くファイル引数も読む\n\
- \e[94m--dry-run,-n\e[0m: rsyncに--dry-runオプションを渡す\n\
-    \e[94m--help,-h\e[0m: ヘルプを表示する\n\
-    \e[94m       --\e[0m: 次以降の引数を強制的にrsyncオプションとする\n\
+  \e[94m--bkrc,-b <file>\e[0m              read <file> as a config file\n\
+  \e[94m--file,-f <file>\e[0m              copy <file> to `/tmp` before any other operations\n\
+  \e[94m--tmp-directory <dir>\e[0m         use <dir> instead of `/tmp` as the tmp directory\n\
+  \e[94m--add <file>\e[0m                  add <file> to the managed file list before any other operations\n\
+  \e[94m--only-add <file>\e[0m             add <file> to the managed file list and exit right away\n\
+  \e[94m--managed-file-list <file>\e[0m    use <file> instead of the default value as the managed file list\n\
+  \e[94m--show,-s\e[0m                     dry-run mode (i.e. just print but never execute commands)\n\
+  \e[94m--dry-run,-n\e[0m                  pass `--dry-run` option to `rsync`\n\
+  \e[94m--help,-h\e[0m                     show this help\n\
+  \e[94m--\e[0m                            pass all of the trailing arguments to `rsync` as options\n\
 ";
 
         } else {
 
             cout << "\
 Usage\n\
-  back [<option(s)>] [<rsync option(s)>]\n\
+  back [<option(s)>] [-- [<rsync option(s)>]]\n\
   \n\
 Options\n\
-    --show,-s: コマンドを実際には実行しない(dry-run)\n\
-    --file,-f: バックアップの実行前に、続くファイル引数を一時フォルダへ複製する\n\
-        --add: 自動管理ファイルリストに、続くファイル引数を追加する\n\
-   --only-add: 同上だが、実際のバックアップまでは行わない\n\
-    --bkrc,-b: デフォルトの設定ファイルに加え、続くファイル引数も読む\n\
- --dry-run,-n: rsyncに--dry-runオプションを渡す\n\
-    --help,-h: ヘルプを表示する\n\
-           --: 次以降の引数を強制的にrsyncオプションとする\n\
+  --bkrc,-b <file>              read <file> as a config file\n\
+  --file,-f <file>              copy <file> to `/tmp` before any other operations\n\
+  --tmp-directory <dir>         use <dir> instead of `/tmp` as the tmp directory\n\
+  --add <file>                  add <file> to the managed file list before any other operations\n\
+  --only-add <file>             add <file> to the managed file list and exit right away\n\
+  --managed-file-list <file>    use <file> instead of the default value as the managed file list\n\
+  --show,-s                     dry-run mode (i.e. just print but never execute commands)\n\
+  --dry-run,-n                  pass `--dry-run` option to `rsync`\n\
+  --help,-h                     show this help\n\
+  --                            pass all of the trailing arguments to `rsync` as options\n\
 ";
 
         }
@@ -91,11 +101,11 @@ Options\n\
 
     //This function checks validity of an option which takes a file name as its argument.
     bool check_validity_of_file_option(const string &option, const string &arg_to_option) {
-        if (!ynn::does_file_exist_without_expansion(arg_to_option)) {
-            cout << prm::colorize_if_isatty(ynn::fg_red_bright);
+        if (!misc::does_file_exist_without_expansion(arg_to_option)) {
+            cout << prm::colorize_if_isatty(color::fg_red_bright);
             prm::print_option_parse_error(option, arg_to_option);
             cout << "The file [ " << arg_to_option << " ] does not exist.\n";
-            cout << prm::colorize_if_isatty(ynn::color_end);
+            cout << prm::colorize_if_isatty(color::color_end);
             cout << flush;
             return false;
         } else {
@@ -104,11 +114,11 @@ Options\n\
     }
 
     bool check_validity_of_directory_option(const string &option, const string &arg_to_option) {
-        if (!ynn::is_directory(arg_to_option)) {
-            cout << prm::colorize_if_isatty(ynn::fg_red_bright);
+        if (!misc::is_directory(arg_to_option)) {
+            cout << prm::colorize_if_isatty(color::fg_red_bright);
             prm::print_option_parse_error(option, arg_to_option);
             cout << "The directory [ " << arg_to_option << " ] does not exist.\n";
-            cout << prm::colorize_if_isatty(ynn::color_end);
+            cout << prm::colorize_if_isatty(color::color_end);
             cout << flush;
             return false;
         } else {
@@ -117,16 +127,16 @@ Options\n\
     }
 
     void print_file_opening_error(const string &file) {
-        cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+        cout << prm::colorize_if_isatty(color::fg_red_bright)
              << "Couldn't open the file [ " << file << " ].\n"
-             << prm::colorize_if_isatty(ynn::color_end)
+             << prm::colorize_if_isatty(color::color_end)
              << flush;
     }
 
     void print_command_failure(int exit_status) {
-        cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+        cout << prm::colorize_if_isatty(color::fg_red_bright)
              << "The command exited with the exit status [ " << exit_status << " ].\n"
-             << prm::colorize_if_isatty(ynn::color_end)
+             << prm::colorize_if_isatty(color::color_end)
              << flush;
     }
 
@@ -162,20 +172,20 @@ Options\n\
             }
 
             void print_() const {
-                cout << prm::colorize_if_isatty(ynn::fg_blue_bright);
+                cout << prm::colorize_if_isatty(color::fg_blue_bright);
                 cout << "Destination: [ " << destination_ << " ]\n";
                 cout << "Source: ";
-                ynn::print_array(source_list_);
+                misc::print_array(source_list_);
                 cout << "Options: ";
-                ynn::print_array(option_to_rsync_list_);
-                cout << prm::colorize_if_isatty(ynn::color_end)
+                misc::print_array(option_to_rsync_list_);
+                cout << prm::colorize_if_isatty(color::color_end)
                      << flush;
             }
 
             void print_destination_() const {
-                cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+                cout << prm::colorize_if_isatty(color::fg_blue_bright)
                      << "-> \"" << destination_ << "\"\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
             }
 
@@ -196,7 +206,7 @@ int main(int argc, char **argv) {
     bool is_only_add_mode = false; //--only-add
     string managed_file_list_file = prm::default_managed_file_list_file; //--managed-file-list
 
-    ynn::GetOpt go(argc, argv, prm::option_list);
+    getopt_class::GetOpt go(argc, argv, prm::option_list);
 
     while (true) {
 
@@ -248,7 +258,6 @@ int main(int argc, char **argv) {
                 if (!prm::check_validity_of_file_option(option, go.get_arg_())) {
                     return 1;
                 }
-                newly_managed_file_list.push_back(go.get_arg_());
                 managed_file_list_file = go.get_arg_();
             } else if (option == "b" || option == "bkrc") {
                 if (!prm::check_validity_of_file_option(option, go.get_arg_())) {
@@ -264,9 +273,9 @@ int main(int argc, char **argv) {
             const string option_to_rsync = go.get_arg_();
 
             if (option_to_rsync[0] != '-') {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "A non-option argument [ " << option_to_rsync << " ] is specified.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush; //`flush` is needed to immediately reflect the effect of `color_end`.
                 return 1;
             }
@@ -281,10 +290,12 @@ int main(int argc, char **argv) {
 
     //-b,--bkrc
     if (config_file_list.empty()) {
-        cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+        cout << prm::colorize_if_isatty(color::fg_red_bright)
              << "No config file is specified. Use at least one -b/--bkrc option.\n"
-             << prm::colorize_if_isatty(ynn::color_end)
+             << prm::colorize_if_isatty(color::color_end)
              << flush;
+        cout << "\n";
+        prm::print_usage();
         return 1;
     }
 
@@ -301,9 +312,9 @@ int main(int argc, char **argv) {
 
             command.push_back(copied_to_tmp_directory_file_list[i]);
 
-            cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+            cout << prm::colorize_if_isatty(color::fg_blue_bright)
                  << copied_to_tmp_directory_file_list[i] << " -> " << tmp_directory << "\n"
-                 << prm::colorize_if_isatty(ynn::color_end)
+                 << prm::colorize_if_isatty(color::color_end)
                  << flush;
 
         }
@@ -311,7 +322,7 @@ int main(int argc, char **argv) {
         command.push_back(tmp_directory);
 
         if (!is_show_mode) {
-            int exit_status = ynn::exec(command);
+            int exit_status = misc::exec(command);
             if (exit_status != 0) {
                 prm::print_command_failure(exit_status);
                 return exit_status;
@@ -341,9 +352,9 @@ int main(int argc, char **argv) {
 
         bool is_list_modified = false;
 
-        cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+        cout << prm::colorize_if_isatty(color::fg_blue_bright)
              << "\n" << "[File Management]" << "\n"
-             << prm::colorize_if_isatty(ynn::color_end)
+             << prm::colorize_if_isatty(color::color_end)
              << flush;
 
         set<string> managed_file_set;
@@ -352,9 +363,9 @@ int main(int argc, char **argv) {
         //Note that absolute paths are contained in `newly_managed_file_list` and that check of their existence has already been done.
         for (int i = 0; i < newly_managed_file_list.size(); ++i) {
             is_list_modified = true;
-            cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+            cout << prm::colorize_if_isatty(color::fg_blue_bright)
                  << "Added the file [ " << newly_managed_file_list[i] << " ] to the managed file list.\n"
-                 << prm::colorize_if_isatty(ynn::color_end)
+                 << prm::colorize_if_isatty(color::color_end)
                  << flush;
             managed_file_set.insert(newly_managed_file_list[i]);
         }
@@ -386,13 +397,13 @@ int main(int argc, char **argv) {
 
             //If a file does not exist, it is not inserted to the set.
             //This means the file is removed from the managed file list since the set will finally be written back to `managed_file_list_file`.
-            if (ynn::does_file_exist_without_expansion(buf)) {
+            if (misc::does_file_exist_without_expansion(buf)) {
                 managed_file_set.insert(buf);
             } else {
                 is_list_modified = true;
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "Removed the file [ " << buf << " ] from the managed file list.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
             }
 
@@ -450,7 +461,7 @@ int main(int argc, char **argv) {
         }
 
         if (!is_show_mode) {
-            int exit_status = ynn::exec(command);
+            int exit_status = misc::exec(command);
             if (exit_status != 0) {
                 prm::print_command_failure(exit_status);
                 return exit_status;
@@ -500,37 +511,37 @@ int main(int argc, char **argv) {
             cin >> reply;
 
             if (!cin) {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "\nThe input was invalid.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return 1;
             } else if (reply == "y") {
-                cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+                cout << prm::colorize_if_isatty(color::fg_blue_bright)
                      << "Proceeding.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
             } else {
-                cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+                cout << prm::colorize_if_isatty(color::fg_blue_bright)
                      << "The operation cancelled.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return 1;
             }
 
         } else if (first_character == '>') {
             
-            const string destination = ynn::word_expansion(line_wo_prefix)[0];
+            const string destination = misc::word_expansion(line_wo_prefix)[0];
             
             //It is relatively difficult to know in advance if the destination exists since it may be on a remote host.
             //Currently, we interpret a destination as a remote directory if it contains a colon ':'.
             //Such destinations are not checked for existence.
-            if (destination.find(':') != string::npos || ynn::does_file_exist_without_expansion(destination)) {
+            if (destination.find(':') != string::npos || misc::does_file_exist_without_expansion(destination)) {
                 backup_unit_list.push_back(prm::BackupUnit(destination, option_to_rsync_list));
             } else {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "The destination [ " << destination << " ] does not exist.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return 1;
             }
@@ -538,21 +549,21 @@ int main(int argc, char **argv) {
         } else if (first_character == '<') {
 
             if (backup_unit_list.empty()) {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "The source [ " << line_wo_prefix << " ] is specified but the destination is empty in the current context.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return 1;
             }
 
-            const string source = ynn::word_expansion(line_wo_prefix)[0];
+            const string source = misc::word_expansion(line_wo_prefix)[0];
             
-            if (ynn::does_file_exist_without_expansion(source)) {
+            if (misc::does_file_exist_without_expansion(source)) {
                 backup_unit_list.back().add_source_(source);
             } else {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "The source [ " << source << " ] does not exist.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return 1;
             }
@@ -560,23 +571,23 @@ int main(int argc, char **argv) {
         } else if (first_character == '-') {
 
             if (backup_unit_list.empty()) {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "The destination specific option [ " << line << " ] is specified but the source is empty in the current context.\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return 1;
             }
 
-            backup_unit_list.back().add_rsync_option_(ynn::word_expansion(line)[0]);
+            backup_unit_list.back().add_rsync_option_(misc::word_expansion(line)[0]);
 
         } else if (first_character == '+') {
 
-            const string config_file = ynn::word_expansion(line_wo_prefix)[0];
+            const string config_file = misc::word_expansion(line_wo_prefix)[0];
 
             #ifndef NDEBUG
-                cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+                cout << prm::colorize_if_isatty(color::fg_blue_bright)
                      << "Recursively sourced the config file [ " << config_file << " ].\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 ++recursion_level;
             #endif
@@ -588,17 +599,17 @@ int main(int argc, char **argv) {
 
         } else if (first_character == '$') {
 
-            cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+            cout << prm::colorize_if_isatty(color::fg_blue_bright)
                  << line << "\n"
-                 << prm::colorize_if_isatty(ynn::color_end)
+                 << prm::colorize_if_isatty(color::color_end)
                  << flush;
 
             if (!is_show_mode) {
                 int exit_status = system(line_wo_prefix.c_str());
                 if (exit_status != 0) {
-                    cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                    cout << prm::colorize_if_isatty(color::fg_red_bright)
                          << "An error occurred while executing the command.\n"
-                         << prm::colorize_if_isatty(ynn::color_end)
+                         << prm::colorize_if_isatty(color::color_end)
                          << flush;
                     return exit_status;
                 }
@@ -624,9 +635,9 @@ int main(int argc, char **argv) {
                     }
 
                     if (!variable_list.count(variable_name)) {
-                        cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                        cout << prm::colorize_if_isatty(color::fg_red_bright)
                              << "The variable [ " << variable_name << " ] was referenced but not defined.\n"
-                             << prm::colorize_if_isatty(ynn::color_end)
+                             << prm::colorize_if_isatty(color::color_end)
                              << flush;
                         return 1;
                     }
@@ -645,9 +656,9 @@ int main(int argc, char **argv) {
             } else { //variable definition
 
                 function<void ()> print_error = [&line_wo_prefix]() -> void {
-                    cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                    cout << prm::colorize_if_isatty(color::fg_red_bright)
                          << "An error occurred while parsing the variable definition [ " << line_wo_prefix << " ].\n"
-                         << prm::colorize_if_isatty(ynn::color_end)
+                         << prm::colorize_if_isatty(color::color_end)
                          << flush;
                 };
 
@@ -674,9 +685,9 @@ int main(int argc, char **argv) {
                 }
 
                 if (variable_list.count(variable_name)) {
-                    cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                    cout << prm::colorize_if_isatty(color::fg_red_bright)
                          << "The variable [ " << variable_name << " ] has already been defined.\n"
-                         << prm::colorize_if_isatty(ynn::color_end)
+                         << prm::colorize_if_isatty(color::color_end)
                          << flush;
                     return 1;
                 }
@@ -688,9 +699,9 @@ int main(int argc, char **argv) {
         } else if (first_character == ' ' || first_character == '\t') {
 
             #ifndef NDEBUG
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "WARNING: The line [ " << line << " ] starts with a whitespace.\n\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
             #endif
 
@@ -700,9 +711,9 @@ int main(int argc, char **argv) {
 
         } else {
 
-            cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+            cout << prm::colorize_if_isatty(color::fg_red_bright)
                  << "An error occurred while parsing the line [ " << line << " ].\n"
-                 << prm::colorize_if_isatty(ynn::color_end)
+                 << prm::colorize_if_isatty(color::color_end)
                  << flush;
             return 1;
 
@@ -716,9 +727,9 @@ int main(int argc, char **argv) {
 
         #ifndef NDEBUG
             output_indent();
-            cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+            cout << prm::colorize_if_isatty(color::fg_blue_bright)
                  << "Started parsing the config file [ " << config_file_name << " ].\n"
-                 << prm::colorize_if_isatty(ynn::color_end)
+                 << prm::colorize_if_isatty(color::color_end)
                  << flush;
         #endif
 
@@ -749,9 +760,9 @@ int main(int argc, char **argv) {
         #ifndef NDEBUG
             output_indent();
             --recursion_level;
-            cout << prm::colorize_if_isatty(ynn::fg_blue_bright)
+            cout << prm::colorize_if_isatty(color::fg_blue_bright)
                  << "Ended parsing the config file [ " << config_file_name << " ].\n"
-                 << prm::colorize_if_isatty(ynn::color_end)
+                 << prm::colorize_if_isatty(color::color_end)
                  << flush;
         #endif
 
@@ -781,17 +792,17 @@ int main(int argc, char **argv) {
 
         if (is_show_mode) {
 
-            ynn::print_array(backup_command);
+            misc::print_array(backup_command);
 
         } else {
 
-            int exit_status = ynn::exec(backup_command);
+            int exit_status = misc::exec(backup_command);
             if (exit_status != 0) {
-                cout << prm::colorize_if_isatty(ynn::fg_red_bright)
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "An error occurred while executing the backup ";
-                ynn::print_array(backup_command);
+                misc::print_array(backup_command);
                 cout << ".\n"
-                     << prm::colorize_if_isatty(ynn::color_end)
+                     << prm::colorize_if_isatty(color::color_end)
                      << flush;
                 return exit_status;
             }
