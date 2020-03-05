@@ -21,30 +21,22 @@
 
                 enum option_attribute_ { normal_, zero_or_one_arg_, one_arg_ };
 
-                //可能なオプションと、その属性(属性は、引数の取り方を表す)
                 vector<string> option_list_;
                 vector<option_attribute_> option_attribute_list_;
-
-                //parse_next_()の度に値が変わり得るもの {
 
                 bool error_flag_ = false;
                 string error_string_;
 
                 bool is_option_ = false;
-                bool has_argument_ = false; //オプションに対応する引数が与えられているか
+                bool has_argument_ = false;
 
                 string option_;
-                string option_argument_; //オプションに対する引数(例えば`--file <file>`で言う`<file>`)
-
-                //} parse_next_()の度に値が変わり得るもの
+                string option_argument_;
 
                 bool has_parse_ended_ = false;
 
             private:
 
-                //`str`が有効なオプションであるか
-                //返り値: 有効なオプションである場合は、`option_list_`内のインデックス
-                //        そうでない場合は、-1
                 int find_from_option_list_(const string &str) {
 
                     for (int i = 0; i < option_list_.size(); ++i) {
@@ -66,7 +58,7 @@
                     }
                     if (should_forbid_zero_arg && argv_.size() == 0) {
                         error_flag_ = true;
-                        error_string_ = "引数が一つも与えられていません。";
+                        error_string_ = "No argument is specified.";
                     }
 
                     for (int i = 0; i < option_list.size(); ++i) {
@@ -84,14 +76,14 @@
                             option_attribute_list_.push_back(one_arg_);
                         } else {
                             error_flag_ = true;
-                            error_string_ = "`option_list`の要素[ " + option_list[i] + " ]が不正です。";
+                            error_string_ = "The element [ " + option_list[i] + " ] of `option_list` is invalid.";
                         }
 
                     }
 
                     if (misc::has_duplicate_element(option_list_.begin(), option_list_.end(), true)) {
                         error_flag_ = true;
-                        error_string_ = "`option_list`の要素に重複があります。";
+                        error_string_ = "`option_list` has duplicated elements.";
                     }
 
                 }
@@ -130,18 +122,18 @@
 
                 void parse_next_() {
 
-                    //static変数 {
+                    //static variables {
 
                     static unsigned index = -1;
 
-                    static bool should_interpret_as_non_option = false; //単なる`--`が与えられたとき、それ以降の引数は非オプションとして扱う
+                    static bool should_interpret_as_non_option = false; //When a simple `--` is given, we interpret the trailing arguments as non-options.
 
-                    static bool is_parsing_combination_of_short_option = false; //`-auv`のような、短いオプションの組み合わせを解析中であるか
-                    static int index_inside_combination; //短いオプションの組み合わせにおいて、次にどの文字を解析するか(例えば`-auv`だと、"a"が0に対応する)
+                    static bool is_parsing_combination_of_short_option = false; //If or not we are parsing a combination of short options like `-auv`.
+                    static int index_inside_combination; //In a combination, which character to parse in the next step. (For example, in `-auv`, "a" corresponds to 0.)
 
-                    //} static変数
+                    //} static variables
 
-                    if (error_flag_) { //既にエラーフラグが立っている場合(例えばコンストラクタが失敗している場合)
+                    if (error_flag_) {
                         return;
                     }
 
@@ -160,7 +152,7 @@
 
                     const string target_str = argv_[index];
 
-                    if (is_parsing_combination_of_short_option) { //短いオプションの組み合わせの解析
+                    if (is_parsing_combination_of_short_option) { //parses a combination of short options
 
                         parse_combination:
 
@@ -173,41 +165,40 @@
                         if (option_index == -1) {
 
                             error_flag_ = true;
-                            error_string_ = "オプション[ " + target_str + " ]の解析中にエラーが発生しました。オプション[ -" + option + " ]は不正です。";
+                            error_string_ = "An error occurred while parsing the option [ " + target_str + " ]. The option [ -" + option + " ] is invalid.";
 
                         } else {
 
                             option_ = option;
 
-                            //`option_`が引数を必ず要するオプションの場合、エラーとする
                             if (!(option_attribute_list_[option_index] == normal_ || option_attribute_list_[option_index] == zero_or_one_arg_)) {
                                 error_flag_ = true;
-                                error_string_ = "オプション[ " + target_str + " ]の解析中にエラーが発生しました。オプション[ -" + option + " ]は引数を取ります。";
+                                error_string_ = "An error occurred while parsing the option [ " + target_str + " ]. The option [ -" + option + " ] takes an argument.";
                                 return;
                             }
 
                             ++index_inside_combination;
 
-                            if (/* length of '-' */ 1 + (index_inside_combination + 1) > target_str.size()) { //短いオプションの組み合わせの解析が終わったとき
+                            if (/* length of '-' */ 1 + (index_inside_combination + 1) > target_str.size()) {
                                 is_parsing_combination_of_short_option = false;
                             }
 
                         }
 
-                    } else if (!should_interpret_as_non_option) { //`-h`や`--file <file>`といった単体のオプションの解析
+                    } else if (!should_interpret_as_non_option) {
 
                         is_option_ = true;
 
                         if (target_str == "-") {
 
                             error_flag_ = true;
-                            error_string_ = "単なる[ " + target_str + " ]が指定されました。";
+                            error_string_ = "A simple [ " + target_str + " ] was specified.";
 
                         } else if (target_str == "--") {
 
                             should_interpret_as_non_option = true;
 
-                            parse_next_(); //"--"自体は無視したいため、ここで再帰呼び出しする
+                            parse_next_(); //calls recursively to ignore "--" itself
 
                         } else if (misc::does_start_with(target_str, "-") || misc::does_start_with(target_str, "--")) {
 
@@ -222,7 +213,7 @@
                                 if (does_start_with_double_hyphen) {
 
                                     error_flag_ = true;
-                                    error_string_ = "不正なオプション[ " + target_str + " ]が指定されました。";
+                                    error_string_ = "An invalid option [ " + target_str + " ] was specified.";
 
                                 } else {
 
@@ -236,21 +227,21 @@
 
                                 option_ = option;
 
-                                if (!does_start_with_double_hyphen && option_.size() > 1) { //"-umount"のようなケース(正しくは"--umount")
+                                if (!does_start_with_double_hyphen && option_.size() > 1) { //handles cases such as "-umount" (The correct string is "--umount".)
                                     error_flag_ = true;
-                                    error_string_ = "オプション[ " + target_str + " ]の形式が不正です。正しくは[ -" + target_str + " ]としてください。";
+                                    error_string_ = "The form of the option [ " + target_str + " ] is invalid. It should be [ -" + target_str + " ].";
                                     return;
                                 }
 
-                                if (option_attribute_list_[option_index] == zero_or_one_arg_ || option_attribute_list_[option_index] == one_arg_) { //オプションに対する引数の処理
+                                if (option_attribute_list_[option_index] == zero_or_one_arg_ || option_attribute_list_[option_index] == one_arg_) { //handles arguments to an option
 
-                                    if (index < argv_.size() - 1 && !misc::does_start_with(argv_[index + 1], "-")) { //引数があるとき
+                                    if (index < argv_.size() - 1 && !misc::does_start_with(argv_[index + 1], "-")) {
                                         has_argument_ = true;
                                         option_argument_ = argv_[index + 1];
                                         ++index;
-                                    } else if (option_attribute_list_[option_index] == one_arg_) { //引数が必要なのに無いとき
+                                    } else if (option_attribute_list_[option_index] == one_arg_) {
                                         error_flag_ = true;
-                                        error_string_ = "オプション[ " + target_str + " ]に対する引数が指定されていません。";
+                                        error_string_ = "An argument to the option [ " + target_str + " ] is not specified.";
                                     }
 
                                 }
@@ -267,7 +258,7 @@
 
                         interpret_as_non_option:
 
-                        is_option_ = false; //これを消してはならない(goto文でここに飛んでくる場合に必要となる)
+                        is_option_ = false; //This line is needed. (Used when jumping here via `goto` statement.)
 
                         option_argument_ = target_str;
 
