@@ -21,7 +21,7 @@
         }
 
         template <class RAI>
-        void print_array(RAI first, RAI last) {
+        void print_array(RAI first, RAI last, bool should_append_newline = true) {
             if (first >= last) { //if the array is empty
                 cout << "[]\n";
                 return;
@@ -33,12 +33,14 @@
                 misc::print_value(*iter);
             }
             cout << "]";
-            cout << "\n";
+            if (should_append_newline) {
+                cout << "\n";
+            }
         }
 
         template <class Type>
-        void print_array(const vector<Type> &v) {
-            misc::print_array(v.begin(), v.end());
+        void print_array(const vector<Type> &v, bool should_append_newline = true) {
+            misc::print_array(v.begin(), v.end(), should_append_newline);
         }
 
         bool does_start_with(const string &str, const string &prefix) {
@@ -87,7 +89,7 @@
 
             if (return_value != 0) {
                 cout << "misc::" << __func__ << "(): An error occurred. Referencing an undefined variable may be the cause.\n";
-                return ret;
+                return vector<string>(1, str);
             }
 
             for (int i = 0; i < result_structure.we_wordc; ++i) {

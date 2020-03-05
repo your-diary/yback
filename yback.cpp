@@ -9,8 +9,6 @@
 
 using namespace std;
 
-#define NDEBUG
-
 namespace prm {
 
     const vector<string> option_list = {
@@ -164,11 +162,21 @@ Options\n\
             }
 
             vector<string> create_backup_command_() const {
+
+                if (source_list_.empty()) {
+                    cout << prm::colorize_if_isatty(color::fg_red_bright)
+                         << "The source which corresponds to the destination [ " << destination_ << " ] is not specified.\n"
+                         << prm::colorize_if_isatty(color::color_end)
+                         << flush; //`flush` is needed to immediately reflect the effect of `color_end`.
+                    return vector<string>();
+                }
+
                 vector<string> command = {"rsync"};
                 command.insert(command.end(), option_to_rsync_list_.begin(), option_to_rsync_list_.end());
                 command.insert(command.end(), source_list_.begin(), source_list_.end());
                 command.push_back(destination_);
                 return command;
+
             }
 
             void print_() const {
@@ -274,9 +282,9 @@ int main(int argc, char **argv) {
 
             if (option_to_rsync[0] != '-') {
                 cout << prm::colorize_if_isatty(color::fg_red_bright)
-                     << "A non-option argument [ " << option_to_rsync << " ] is specified.\n"
+                     << "The non-option argument [ " << option_to_rsync << " ] is specified.\n"
                      << prm::colorize_if_isatty(color::color_end)
-                     << flush; //`flush` is needed to immediately reflect the effect of `color_end`.
+                     << flush;
                 return 1;
             }
 
@@ -332,9 +340,9 @@ int main(int argc, char **argv) {
     }
 
     //File Management
-    //This is related to the `--add` or the `--only-add` option, but the list of managed files can generally be modified even when they are not specified.
+    //This is related to `--add` or `--only-add` option, but the list of managed files can generally be modified even when they are not specified.
     //
-    //File management is a generalization of the `-f` option.
+    //File management is the generalization of `-f` option.
     //If a file <file> is "manage"d, it is equivalent to specify `-f <file>` every time you launch `yback`.
     //File management works as below.
     //1. You can add files to the list of managed files, using `--add` option or `--only-add` option.
@@ -472,11 +480,13 @@ int main(int argc, char **argv) {
             return 0;
         }
 
+        cout << "\n";
+
     }
     end_of_file_management:
 
     //for debug
-    //Adds indents to outputs to make the structure of recursion clearer.
+    //Adds indents to outputs to make the structure of recursion visible.
     #ifndef NDEBUG
         unsigned recursion_level = 0;
         function<void ()> output_indent = [&recursion_level]() -> void {
@@ -486,14 +496,13 @@ int main(int argc, char **argv) {
         };
     #endif
 
-    //This is a dictionary of backup units.
-    //A key is a path of destination.
-    //A value is a `prm::BackupUnit` class object whose members represent sources, options to rsync, etc.
+    //This is an array of backup units.
+    //Each element is a `prm::BackupUnit` class object whose members represent sources, options to rsync, etc.
     vector<prm::BackupUnit> backup_unit_list;
 
     map<string, string> variable_list;
 
-    function<int (const string &)> parse_config_file; //The definition is given right after the definition of `parse_line()`.
+    function<int (const string &)> parse_config_file; //The definition of this function is given right after the definition of `parse_line()`.
 
     function<int (const string)> parse_line = [&](const string &line) -> /* exit status */ int {
 
@@ -621,7 +630,7 @@ int main(int argc, char **argv) {
 
             istringstream is(line_wo_prefix);
 
-            if (line_wo_prefix.find('=') == string::npos) { //variable reference
+            if (line_wo_prefix.find('=') == string::npos) { //variable references
 
                 vector<string> variable_reference_list;
 
@@ -653,7 +662,7 @@ int main(int argc, char **argv) {
                     }
                 }
 
-            } else { //variable definition
+            } else { //variable definitions
 
                 function<void ()> print_error = [&line_wo_prefix]() -> void {
                     cout << prm::colorize_if_isatty(color::fg_red_bright)
@@ -788,6 +797,10 @@ int main(int argc, char **argv) {
     for (int i = 0; i < backup_unit_list.size(); ++i) {
 
         const vector<string> backup_command = backup_unit_list[i].create_backup_command_();
+        if (backup_command.empty()) {
+            return 1;
+        }
+
         backup_unit_list[i].print_destination_();
 
         if (is_show_mode) {
@@ -800,7 +813,7 @@ int main(int argc, char **argv) {
             if (exit_status != 0) {
                 cout << prm::colorize_if_isatty(color::fg_red_bright)
                      << "An error occurred while executing the backup ";
-                misc::print_array(backup_command);
+                misc::print_array(backup_command, /* should_append_newline = */ false);
                 cout << ".\n"
                      << prm::colorize_if_isatty(color::color_end)
                      << flush;
