@@ -28,6 +28,8 @@
 
 - destinations
 
+- destination specific options passed to `rsync`
+
 - arbitrary shell commands
 
 - variable definitions/references
