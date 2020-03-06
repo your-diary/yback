@@ -33,7 +33,7 @@ namespace prm {
 
             cout << "\
 \e[;100mUsage\e[0m\n\
-  back [<option(s)>] [-- [<rsync option(s)>]]\n\
+  yback [<option(s)>] [-- [<rsync option(s)>]]\n\
   \n\
 \e[;100mOptions\e[0m\n\
   \e[94m--bkrc,-b <file>\e[0m              read <file> as a config file\n\
@@ -52,7 +52,7 @@ namespace prm {
 
             cout << "\
 Usage\n\
-  back [<option(s)>] [-- [<rsync option(s)>]]\n\
+  yback [<option(s)>] [-- [<rsync option(s)>]]\n\
   \n\
 Options\n\
   --bkrc,-b <file>              read <file> as a config file\n\

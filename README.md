@@ -79,7 +79,7 @@ Let's just print the generated commands but not execute them.
 ```bash
 ~ $ export USER=mike
 ~ $ export IP=192.168.24.41
-~ $ back --bkrc config.txt --show
+~ $ yback --bkrc config.txt --show
 $ echo hello
 
 -> "/home/user/Desktop/backups"
@@ -92,7 +92,7 @@ $ echo hello
 
 Simply removing `--show` actually executes the commands.
 ```bash
-~ $ back --bkrc config.txt
+~ $ yback --bkrc config.txt
 
 [File Management]
 
@@ -122,9 +122,9 @@ total size is 0  speedup is 0.00 (DRY RUN)
 ### Command Usage
 
 ```bash
-~ $ back --help
+~ $ yback --help
 Usage
-  back [<option(s)>] [-- [<rsync option(s)>]]
+  yback [<option(s)>] [-- [<rsync option(s)>]]
 
 Options
   --bkrc,-b <file>              read <file> as a config file
@@ -261,7 +261,7 @@ A `comment` line is ignored.
 empty-line = white-space-symbol, string, newline-symbol ;
 ```
 
-An `empty` line is ignored.
+An `empty` line is ignored. Currently, this means you cannot indent any lines.
 
 ```bash
 white-space-symbol = ' ' | '\t' ;
