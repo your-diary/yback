@@ -504,7 +504,9 @@ int main(int argc, char **argv) {
 
     function<int (const string &)> parse_config_file; //The definition of this function is given right after the definition of `parse_line()`.
 
-    function<int (const string)> parse_line = [&](const string &line) -> /* exit status */ int {
+    function<int (const string)> parse_line = [&](const string &original_line) -> /* exit status */ int {
+
+        const string line = misc::omit_whitespaces_from_string(original_line); //omits preceding and trailing whitespaces
 
         if (line.empty()) { //ignores empty lines
             return 0;
@@ -704,15 +706,6 @@ int main(int argc, char **argv) {
                 variable_list[variable_name] = string(variable_value.begin() + 1 /* This `1` omits a preceding space. */, variable_value.end());
 
             }
-
-        } else if (first_character == ' ' || first_character == '\t') {
-
-            #ifndef NDEBUG
-                cout << prm::colorize_if_isatty(color::fg_red_bright)
-                     << "WARNING: The line [ " << line << " ] starts with a whitespace.\n\n"
-                     << prm::colorize_if_isatty(color::color_end)
-                     << flush;
-            #endif
 
         } else if (first_character == '#') {
 

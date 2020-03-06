@@ -3,7 +3,10 @@
     #define is_misc_included
 
     #include <iostream>
+    #include <cstring>
+    #include <vector>
     #include <set>
+    #include <unistd.h>
     #include <wordexp.h>
     #include <sys/wait.h>
 
@@ -159,6 +162,28 @@
 
             return misc::execute(argv[0], argv);
 
+        }
+
+        string omit_whitespaces_from_string(const string &str) {
+
+            size_t first_index = str.find_first_not_of(" \t\n");
+            size_t last_index = str.find_last_not_of(" \t\n");
+
+            if (first_index == string::npos) { //When this condition is satisfied, so is `last_index == string::npos`.
+                return string();
+            }
+
+            return string(str.begin() + first_index, str.begin() + last_index + 1);
+
+        }
+
+        string omit_whitespaces_from_string(const char *str) {
+            return omit_whitespaces_from_string(string(str, str + strlen(str)));
+        }
+
+        template <class RAI>
+        string omit_whitespaces_from_string(RAI first, RAI last) {
+            return omit_whitespaces_from_string(string(first, last));
         }
 
     }

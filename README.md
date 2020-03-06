@@ -201,41 +201,43 @@ See [Example](#syntax_file_example).
 In this section we use [EBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) to explain the config file syntax.
 
 ```bash
-rule = { question-spec | backup-unit-spec | load-spec | shell-command-spec | variable-spec | comment | empty-line } ;
+rule-spec = { rule } ;
+rule = { white-space-symbol }, ( line-spec, newline-symbol | backup-unit-spec ) ;
+line-spec = question-spec | load-spec | shell-command-spec | variable-spec | comment | empty-line ;
 ```
 
-`rule` is the most parent [production rule](https://en.wikipedia.org/wiki/Production_(computer_science)).
+`rule-spec` is the most parent [production rule](https://en.wikipedia.org/wiki/Production_(computer_science)). Since the first part of `rule` optionally has one or more whitespaces, any lines can be indented.
 
 ```bash
-question-spec = '? ', message, newline-symbol ;
+backup-unit-spec = destination-spec, newline-symbol {, { white-space-symbol }, ( line-spec | source-spec | option-spec ), newline-symbol } ;
+
+destination-spec = '> ', destination ;
+destination = non-empty-string ;
+
+source-spec = '< ', source ;
+source = non-empty-string ;
+
+option-spec = '-', non-empty-string ;
+```
+
+`backup-unit-spec` is the most important. This specifies a destination, sources and options passed to `rsync`. You must specify at least one `source-spec` explicitly, or implicitly as the result of `variable-reference` (see below). Note, for example, you should specify `-verbose` as `non-empty-string` in `option-spec` to pass `--verbose` option to `rsync`.
+
+```bash
+question-spec = '? ', message ;
 message = string ;
 ```
 
 When `question-spec` is read, `message` is printed and a user input is requested. `yback` is cancelled unless you type "y".
 
 ```bash
-backup-unit-spec = destination-spec {, ( rule - backup-unit-spec | source-spec | option-spec ) } ;
-
-destination-spec = '> ', destination, newline-symbol ;
-destination = non-empty-string ;
-
-source-spec = '< ', source, newline-symbol ;
-source = non-empty-string ;
-
-option-spec = '-', non-empty-string, newline-symbol ;
-```
-
-`backup-unit-spec` is the most important. This specifies a destination, sources and options passed to `rsync`. You must specify at least one `source-spec` explicitly, or implicitly as the result of `variable-reference` (see below). Note, for example, you should specify `-verbose` as `non-empty-string` in `option-spec` to pass `--verbose` option to `rsync`.
-
-```bash
-load-spec = '+ ', filename, newline-symbol ;
+load-spec = '+ ', filename ;
 filename = non-empty-string ;
 ```
 
 `load-spec` specifies a config file which is started to be read at the very moment the `load-spec` is parsed. After reading `filename`, the control (the parser) goes back to the position right after the `load-spec`.
 
 ```bash
-shell-command-spec = '$ ', shell-command, newline-symbol ;
+shell-command-spec = '$ ', shell-command ;
 shell-command = non-empty-string ;
 ```
 
@@ -243,34 +245,32 @@ shell-command = non-empty-string ;
 
 ```bash
 variable-spec = variable-definition | variable-reference ;
-variable-definition = '% ', variable-name, ' = ', variable-value, newline-symbol ;
-variable-reference = '% ', variable-name {, ' ', variable-name }, newline-symbol ;
+variable-definition = '% ', variable-name, ' = ', variable-value ;
+variable-reference = '% ', variable-name {, ' ', variable-name } ;
 variable-name = non-empty-string ;
 variable-value = non-empty-string ;
 ```
 
-`variable-spec` defines or references *variable*s. Variables here are specific to `yback` and totally irrelevant to shell (environment) variables. When you reference a variable `variable-name` via `variable-reference`, the corresponding `variable-value` is parsed as if it were explicitly written there.
+`variable-spec` defines or references *variable*s. Variables here are specific to `yback` and totally irrelevant to shell (environment) variables. When you reference a variable `variable-name` via `variable-reference`, the corresponding `variable-value` (plus a `newline-symbol`) is parsed as if it were explicitly written there.
 
 ```bash
-comment = '#', string, new-line-symbol ;
+comment = '#', string ;
+
+empty-line =  ;
 ```
 
-A `comment` line is ignored.
-
-```bash
-empty-line = white-space-symbol, string, newline-symbol ;
-```
-
-An `empty` line is ignored. Currently, this means you cannot indent any lines.
+A `comment` or an `empty` line is ignored.
 
 ```bash
 white-space-symbol = ' ' | '\t' ;
 
 newline-symbol = '\n' ;
 
-string = (* any string *) ;
+character-symbol = (* any single character *) ;
 
-empty-string = '' ;
+string = { character-symbol } ;
+
+empty-string = { white-space-symbol };
 
 non-empty-string = string - empty-string ;
 
