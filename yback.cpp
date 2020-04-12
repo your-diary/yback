@@ -27,6 +27,8 @@ namespace prm {
 
     const string default_managed_file_list_file = misc::word_expansion("~/.yback_managed_file_list")[0];
 
+    const string lock_file = misc::word_expansion("~/.yback.lock")[0];
+
     void print_usage() {
 
         if (isatty(1)) {
@@ -77,6 +79,37 @@ Options\n\
         } else {
             return "";
         }
+    }
+
+    void lock() {
+
+        if (misc::does_file_exist_without_expansion(prm::lock_file)) {
+            cout << prm::colorize_if_isatty(color::fg_red_bright);
+            cout << "Another session of `yback` is being executed.\n";
+            cout << prm::colorize_if_isatty(color::color_end);
+            cout << flush;
+            errno = 1;
+            return;
+        }
+
+        errno = 0; //This is needed since `realpath()` inside `misc::does_file_exist_without_expansion()` sets `errno` to some non-zero value if the file does not exist.
+
+        ofstream ofs(prm::lock_file.c_str());
+        if (!ofs) {
+            cout << prm::colorize_if_isatty(color::fg_red_bright);
+            cout << "Failed in locking.\n";
+            cout << prm::colorize_if_isatty(color::color_end);
+            cout << flush;
+            errno = 1;
+            return;
+        }
+
+        ofs.close();
+
+    }
+
+    void unlock() {
+        remove(prm::lock_file.c_str());
     }
 
     //The argument `option` should not have preceding hyphen(s) since they are appropriately prepended inside this function.
@@ -202,6 +235,12 @@ Options\n\
 }
 
 int main(int argc, char **argv) {
+
+    prm::lock();
+    if (errno != 0) {
+        return 1;
+    }
+    atexit(prm::unlock);
 
     //option parsing {
 
