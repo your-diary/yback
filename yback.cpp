@@ -232,9 +232,25 @@ Options\n\
 
     };
 
+    unsigned signal_status = -1;
+
+    void signal_handler(int signal) {
+        if (signal == SIGINT) {
+            #ifndef NDEBUG
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
+                     << "SIGINT was caught.\n"
+                     << prm::colorize_if_isatty(color::color_end)
+                     << flush;
+            #endif
+            signal_status = SIGINT;
+        }
+    }
+
 }
 
 int main(int argc, char **argv) {
+
+    signal(SIGINT, prm::signal_handler);
 
     prm::lock();
     if (errno != 0) {
@@ -842,9 +858,18 @@ int main(int argc, char **argv) {
         } else {
 
             int exit_status = misc::exec(backup_command);
+            
+            if (prm::signal_status == SIGINT) {
+                cout << prm::colorize_if_isatty(color::fg_red_bright)
+                     << "\nSIGINT was caught.\nThe operations were cancelled.\n"
+                     << prm::colorize_if_isatty(color::color_end)
+                     << flush;
+                return 1;
+            }
+
             if (exit_status != 0) {
                 cout << prm::colorize_if_isatty(color::fg_red_bright)
-                     << "An error occurred while executing the backup ";
+                     << "\nAn error occurred while executing the backup ";
                 misc::print_array(backup_command, /* should_append_newline = */ false);
                 cout << ".\n"
                      << prm::colorize_if_isatty(color::color_end)
