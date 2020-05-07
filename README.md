@@ -331,7 +331,7 @@ Uninstall the installed program. This is completely irrelevant to `make clean`.
 
 Contributions are all welcome.
 
-When you would like to suggest a new feature or have found a bug, if you have a GitHub :octocat: account, please send a pull request or open an issue. If you don't, please send a mail :email: to [takahashi.manatsu@gmail.com](mailto:takahashi.manatsu@gmail.com).
+When you would like to suggest a new feature or have found a bug, if you have a GitHub :octocat: account, please send a pull request or open an issue. If you don't, please send a mail :email: to [manatsu@your-diary.com](mailto:manatsu@your-diary.com).
 
 Also, translating this document is very much appreciated.
 
