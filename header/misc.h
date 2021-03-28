@@ -10,6 +10,16 @@
     #include <wordexp.h>
     #include <sys/wait.h>
 
+#if (defined(__APPLE__))
+
+    extern char **environ;
+
+    int execvpe(const char *file, char * const argv[], char * const envp[]) {
+        return execvp(file, argv);
+    }
+
+#endif
+
     namespace misc {
 
         using namespace std;
@@ -118,7 +128,12 @@
         }
 
         bool is_directory(const string &path) {
+
+#if (defined(__APPLE__))
+            const char *pwd = getcwd(NULL, 0);
+#else
             const char *pwd = get_current_dir_name();
+#endif
             int exit_status = chdir(path.c_str());
             chdir(pwd);
             return (exit_status == 0);
